@@ -8,6 +8,6 @@ GPIO.setup(11, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 try:
     while True:
         print(GPIO.input(11))
-        sleep(5)
+        sleep(3)
 except KeyboardInterrupt:
     GPIO.cleanup()
