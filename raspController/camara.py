@@ -1,11 +1,12 @@
 from picamera import PiCamera, Color
 from time import sleep
-# configurate camera
-camera.resolution = (2592, 1944)
-camera.framerate = 15
-
 
 camera = PiCamera()
+
+# configurate camera
+#camera.resolution = (2592, 1944)
+#camera.framerate = 15
+
 # para tomar fotos.
 camera.start_preview()
 camera.annotate_text = "colocar fecha!"
