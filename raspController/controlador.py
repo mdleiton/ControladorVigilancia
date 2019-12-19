@@ -14,26 +14,28 @@ SENSOR_MOVIMIENTO_2 = 13    ### en 180 grados
 DIR_SENSOR_MOVIMIENTO_2 = 180
 SERVOR_MOTOR = 12
 
-# POSIBLES PARÁMETRO DE UN NODOS
-CANTIDAD_FOTOS = 2
-INTENTOS_NOTIFICAR = 3
+# POSIBLES PARAMETRO DE UN NODOS
+CANTIDAD_FOTOS = 1
+INTENTOS_NOTIFICAR = 1
 DIR_IMAGENES = "/home/pi/imagenes/"
 DIR_VIDEOS = "/home/pi/video/"
-URL_SERVER = ""
-END_POINT_SEND_ALARM = ""
+URL_SERVER = "http://200.126.1.152:8080/"
+END_POINT_SEND_ALARM = "alarm/"
 
-# configuración del primer sensor de movimiento
+ANGULO_ACTUAL = 0
+
+# configuracion del primer sensor de movimiento
 GPIO.setup(SENSOR_MOVIMIENTO_1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
-# configuración del segundo sensor de movimiento
-GPIO.setup(SENSOR_MOVIMIENTO_1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+# configuracion del segundo sensor de movimiento
+GPIO.setup(SENSOR_MOVIMIENTO_2, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
-# configuración del servomotor
+# configuracion del servomotor
 GPIO.setup(SERVOR_MOTOR, GPIO.OUT)
 pwm = GPIO.PWM(SERVOR_MOTOR, 50)
 pwm.start(0)
 
-# configuración de la camara
+# configuracion de la camara
 camera = PiCamera()
 #camera.resolution = (2592, 1944)
 #camera.framerate = 15
@@ -41,9 +43,12 @@ camera = PiCamera()
 def tomar_foto(nombre):
     """toma una foto y la guarda con nombre en DIR_IMAGENES"""
     syslog.syslog('Foto tomada, guardada con nombre:' + nombre)
+    #camera.start_preview()
     camera.annotate_text = nombre
+    #sleep(1)
     camera.annotate_text_size = 50   # tamano
     camera.annotate_background = Color('blue')
+    #camera.stop_preview()
     camera.capture(DIR_IMAGENES + nombre)
 
 
@@ -65,30 +70,36 @@ def enviar_fotos():
     """toma fotos y envia al servidor"""
     envio_correcto = True
     for i in range(CANTIDAD_FOTOS):
-        fecha = obtener_fecha_hora()
-        tomar_foto(fecha + ".jpg")
-        files = {'media': open(fecha + ".jpg", 'rb')}
-        r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files)
-        if r.status_code ==  200:
-            syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
-        else:
-            syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
-            envio_correcto = False
+        intentos = INTENTOS_NOTIFICAR
+        while intentos>0:
+            intentos -= 1
+            nombre = obtener_fecha_hora() +  ".jpg"
+            tomar_foto(nombre)
+            files = {'media': open(DIR_IMAGENES + nombre, 'rb')}
+            """r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files)
+            if r.status_code ==  200:
+                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
+            else:
+                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
+                envio_correcto = False
+            """
     return envio_correcto
 
 def mover_x_angulos(angulos):
     """controla el servomotor, hace que se mueva x angulo en grados."""
-    duty = angulos / 18 + 2
-    GPIO.output(SERVOR_MOTOR, True)
-    pwm.ChangeDutyCycle(duty)
-    sleep(1)
-    GPIO.output(SERVOR_MOTOR, False)
-    pwm.ChangeDutyCycle(0)
-    sleep(1)
+    global ANGULO_ACTUAL
+    if ANGULO_ACTUAL != angulos:
+        duty = angulos / 18 + 2
+        GPIO.output(SERVOR_MOTOR, True)
+        pwm.ChangeDutyCycle(duty)
+        sleep(1)
+        GPIO.output(SERVOR_MOTOR, False)
+        pwm.ChangeDutyCycle(0)
+        ANGULO_ACTUAL = angulos
 
 def notificar(id_sensor):
-    """en caso de detectar movimiento en id_sensor, se moverá a su ubicación, tomará fotos y enviará al servidor."""
-    if id_sensor = SENSOR_MOVIMIENTO_1:
+    """en caso de detectar movimiento en id_sensor, se movera a su ubicacion, tomara fotos y enviara al servidor."""
+    if id_sensor == SENSOR_MOVIMIENTO_1:
         mover_x_angulos(DIR_SENSOR_MOVIMIENTO_1)
         return enviar_fotos()
     else:
@@ -101,18 +112,18 @@ def detectar_movimiento(id_sensor):
     return not GPIO.input(id_sensor)
 
 syslog.syslog('Sensores correctamente inicializados.')
+mover_x_angulos(180)
 try:
     while True:
         if detectar_movimiento(SENSOR_MOVIMIENTO_1):
             syslog.syslog('Sensor de movimiento 1 a detectado movimiento.')
-            intentos = INTENTOS_NOTIFICAR
-            while not notificar(SENSOR_MOVIMIENTO_1) and intentos>0:
-                intentos -= 1
+            notificar(SENSOR_MOVIMIENTO_1)
+        """
         if detectar_movimiento(SENSOR_MOVIMIENTO_2):
             syslog.syslog('Sensor de movimiento 2 a detectado movimiento.')
-            intentos = INTENTOS_NOTIFICAR
-            while not notificar(SENSOR_MOVIMIENTO_1) and intentos>0:
-                intentos -= 1
+            notificar(SENSOR_MOVIMIENTO_2)
+        """
+        mover_x_angulos(180)
         sleep(1)
 except KeyboardInterrupt:
     syslog.syslog(syslog.LOG_ERR, 'Controlador a finalizado inesperadamente.')
