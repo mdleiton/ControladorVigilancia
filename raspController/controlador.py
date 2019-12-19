@@ -3,6 +3,7 @@ from picamera import PiCamera, Color
 from time import sleep
 from datetime import datetime
 import requests
+import threading
 import syslog
 syslog.syslog('Controlador Inicializado')
 
@@ -40,6 +41,25 @@ camera = PiCamera()
 #camera.resolution = (2592, 1944)
 #camera.framerate = 15
 
+lock = threading.Lock()
+
+def thread_function():
+    global lock
+    for i in range(CANTIDAD_FOTOS):
+        nombre = obtener_fecha_hora() +  ".jpg"
+        lock.acquire()
+        tomar_foto(nombre)
+        lock.release()
+        intentos = INTENTOS_NOTIFICAR
+        while intentos>0:
+            intentos -= 1
+            files = {'media': open(DIR_IMAGENES + nombre, 'rb')}
+            r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files)
+            if r.status_code ==  200:
+                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
+            else:
+                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
+
 def tomar_foto(nombre):
     """toma una foto y la guarda con nombre en DIR_IMAGENES"""
     syslog.syslog('Foto tomada, guardada con nombre:' + nombre)
@@ -68,22 +88,9 @@ def obtener_fecha_hora():
 
 def enviar_fotos():
     """toma fotos y envia al servidor"""
-    envio_correcto = True
-    for i in range(CANTIDAD_FOTOS):
-        intentos = INTENTOS_NOTIFICAR
-        while intentos>0:
-            intentos -= 1
-            nombre = obtener_fecha_hora() +  ".jpg"
-            tomar_foto(nombre)
-            files = {'media': open(DIR_IMAGENES + nombre, 'rb')}
-            """r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files)
-            if r.status_code ==  200:
-                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
-            else:
-                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
-                envio_correcto = False
-            """
-    return envio_correcto
+    x = threading.Thread(target=thread_function)
+    x.start()
+    return True
 
 def mover_x_angulos(angulos):
     """controla el servomotor, hace que se mueva x angulo en grados."""
@@ -124,7 +131,6 @@ try:
             notificar(SENSOR_MOVIMIENTO_2)
         """
         mover_x_angulos(180)
-        sleep(1)
 except KeyboardInterrupt:
     syslog.syslog(syslog.LOG_ERR, 'Controlador a finalizado inesperadamente.')
     pwm.stop()
