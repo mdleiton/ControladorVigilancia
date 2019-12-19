@@ -12,7 +12,7 @@ GPIO.setmode(GPIO.BOARD)
 contador_foto = 0
 SENSOR_MOVIMIENTO_1 = 11    ### en 0 grados
 DIR_SENSOR_MOVIMIENTO_1 = 0
-SENSOR_MOVIMIENTO_2 = 13    ### en 180 grados
+SENSOR_MOVIMIENTO_2 = 18    ### en 180 grados
 DIR_SENSOR_MOVIMIENTO_2 = 180
 SERVOR_MOTOR = 12
 
@@ -46,11 +46,11 @@ lock = threading.Lock()
 
 def thread_function():
     global lock, contador_foto
-    for i in range(CANTIDAD_FOTOS):
+    for i in range(0, CANTIDAD_FOTOS):
         nombre = obtener_fecha_hora() +  ".h264" #".jpg"
         lock.acquire()
-        grabar(nombre, 4)
-        tomar_foto(nombre)
+        grabar(nombre, 10)
+        #tomar_foto(nombre)
         lock.release()
         intentos = INTENTOS_NOTIFICAR
         while intentos>0:
@@ -65,6 +65,7 @@ def thread_function():
                     syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
             except Exception:
                 syslog.syslog("TimeoutException")
+        return 1
 
 def tomar_foto(nombre):
     """toma una foto y la guarda con nombre en DIR_IMAGENES"""
@@ -105,7 +106,7 @@ def mover_x_angulos(angulos):
         duty = angulos / 18 + 2
         GPIO.output(SERVOR_MOTOR, True)
         pwm.ChangeDutyCycle(duty)
-        sleep(0.5)
+        sleep(0.25)
         GPIO.output(SERVOR_MOTOR, False)
         pwm.ChangeDutyCycle(0)
         ANGULO_ACTUAL = angulos
@@ -129,33 +130,36 @@ def detectar_movimiento(id_sensor):
         return False
 
 syslog.syslog('Sensores correctamente inicializados.')
-#mover_x_angulos(180)
 
+mover_x_angulos(0)
 try:
     while True:
         while detectar_movimiento(SENSOR_MOVIMIENTO_1):
             syslog.syslog('Sensor de movimiento 1 a detectado movimiento.')
             notificar(SENSOR_MOVIMIENTO_1)
             contador_foto +=1 
-            if contador_foto > 12:
+            if contador_foto > 5:
                 syslog.syslog('max')
                 contador_foto = 0
-                sleep(1)
+                sleep(5)
                 break
-        if detectar_movimiento(SENSOR_MOVIMIENTO_2):
+            sleep(4)
+        while detectar_movimiento(SENSOR_MOVIMIENTO_2):
             syslog.syslog('Sensor de movimiento 2 a detectado movimiento.')
             notificar(SENSOR_MOVIMIENTO_2)
             contador_foto +=1 
-            if contador_foto > 12:
+            if contador_foto > 5:
                 syslog.syslog('max')
                 contador_foto = 0
-                sleep(1)
+                sleep(5)
                 break
-        
+            sleep(4)
+        sleep(1)
         #mover_x_angulos(180)
-        sleep(0.25)
 except KeyboardInterrupt:
     syslog.syslog(syslog.LOG_ERR, 'Controlador a finalizado inesperadamente.')
+    mover_x_angulos(0)
     pwm.stop()
     GPIO.cleanup()
     syslog.closelog()
+mover_x_angulos(0)
