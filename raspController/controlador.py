@@ -2,13 +2,14 @@ import RPi.GPIO as GPIO
 from picamera import PiCamera, Color
 from time import sleep
 from datetime import datetime
+import signal
 import requests
 import threading
 import syslog
 syslog.syslog('Controlador Inicializado')
 
 GPIO.setmode(GPIO.BOARD)
-
+contador_foto = 0
 SENSOR_MOVIMIENTO_1 = 11    ### en 0 grados
 DIR_SENSOR_MOVIMIENTO_1 = 0
 SENSOR_MOVIMIENTO_2 = 13    ### en 180 grados
@@ -19,7 +20,7 @@ SERVOR_MOTOR = 12
 CANTIDAD_FOTOS = 1
 INTENTOS_NOTIFICAR = 1
 DIR_IMAGENES = "/home/pi/imagenes/"
-DIR_VIDEOS = "/home/pi/video/"
+DIR_VIDEOS = "/home/pi/videos/"
 URL_SERVER = "http://200.126.1.152:8080/"
 END_POINT_SEND_ALARM = "alarm/"
 
@@ -39,35 +40,40 @@ pwm.start(0)
 # configuracion de la camara
 camera = PiCamera()
 #camera.resolution = (2592, 1944)
-#camera.framerate = 15
+camera.framerate = 15
 
 lock = threading.Lock()
 
 def thread_function():
-    global lock
+    global lock, contador_foto
     for i in range(CANTIDAD_FOTOS):
-        nombre = obtener_fecha_hora() +  ".jpg"
+        nombre = obtener_fecha_hora() +  ".h264" #".jpg"
         lock.acquire()
+        grabar(nombre, 5)
         tomar_foto(nombre)
         lock.release()
         intentos = INTENTOS_NOTIFICAR
         while intentos>0:
             intentos -= 1
+            break
             files = {'media': open(DIR_IMAGENES + nombre, 'rb')}
-            r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files)
-            if r.status_code ==  200:
-                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
-            else:
-                syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
+            try: 
+                r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files, timeout=2)
+                if r.status_code ==  200:
+                    syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
+                else:
+                    syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
+            except Exception:
+                syslog.syslog("TimeoutException")
 
 def tomar_foto(nombre):
     """toma una foto y la guarda con nombre en DIR_IMAGENES"""
     syslog.syslog('Foto tomada, guardada con nombre:' + nombre)
     #camera.start_preview()
-    camera.annotate_text = nombre
+    #camera.annotate_text = nombre
     #sleep(1)
-    camera.annotate_text_size = 50   # tamano
-    camera.annotate_background = Color('blue')
+    #camera.annotate_text_size = 50   # tamano
+    #camera.annotate_background = Color('blue')
     #camera.stop_preview()
     camera.capture(DIR_IMAGENES + nombre)
 
@@ -99,7 +105,7 @@ def mover_x_angulos(angulos):
         duty = angulos / 18 + 2
         GPIO.output(SERVOR_MOTOR, True)
         pwm.ChangeDutyCycle(duty)
-        sleep(1)
+        sleep(0.5)
         GPIO.output(SERVOR_MOTOR, False)
         pwm.ChangeDutyCycle(0)
         ANGULO_ACTUAL = angulos
@@ -115,22 +121,35 @@ def notificar(id_sensor):
 
 
 def detectar_movimiento(id_sensor):
+    contador = 0
     """funcion que lee la entrada del sensor de movimiento respectivo y verifica si existe alguna alarma nueva."""
-    return not GPIO.input(id_sensor)
+    on = 1 if GPIO.input(id_sensor) == 0 else 0 
+    if on>=1:
+        return True
+    else:
+        return False
 
 syslog.syslog('Sensores correctamente inicializados.')
 mover_x_angulos(180)
+
 try:
     while True:
-        if detectar_movimiento(SENSOR_MOVIMIENTO_1):
+        while detectar_movimiento(SENSOR_MOVIMIENTO_1):
             syslog.syslog('Sensor de movimiento 1 a detectado movimiento.')
             notificar(SENSOR_MOVIMIENTO_1)
+            contador_foto +=1 
+            if contador_foto > 10:
+                syslog.syslog('max')
+                contador_foto = 0
+                sleep(1)
+                break
         """
         if detectar_movimiento(SENSOR_MOVIMIENTO_2):
             syslog.syslog('Sensor de movimiento 2 a detectado movimiento.')
             notificar(SENSOR_MOVIMIENTO_2)
         """
-        mover_x_angulos(180)
+        #mover_x_angulos(180)
+        sleep(0.25)
 except KeyboardInterrupt:
     syslog.syslog(syslog.LOG_ERR, 'Controlador a finalizado inesperadamente.')
     pwm.stop()
