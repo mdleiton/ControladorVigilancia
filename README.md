@@ -30,8 +30,3 @@ El controlador esta compuesto de los siguientes componentes:
     cd raspController
     python controlador.py
 ´´´
-
-
-----------------------------------
-### Autor ###
-* Mauricio Leiton Lázaro [github](https://github.com/mdleiton)
