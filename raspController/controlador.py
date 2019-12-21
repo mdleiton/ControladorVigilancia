@@ -49,7 +49,7 @@ def thread_function():
     for i in range(CANTIDAD_FOTOS):
         nombre = obtener_fecha_hora() +  ".h264" #".jpg"
         lock.acquire()
-        grabar(nombre, 5)
+        grabar(nombre, 4)
         tomar_foto(nombre)
         lock.release()
         intentos = INTENTOS_NOTIFICAR
@@ -121,7 +121,6 @@ def notificar(id_sensor):
 
 
 def detectar_movimiento(id_sensor):
-    contador = 0
     """funcion que lee la entrada del sensor de movimiento respectivo y verifica si existe alguna alarma nueva."""
     on = 1 if GPIO.input(id_sensor) == 0 else 0 
     if on>=1:
@@ -130,7 +129,7 @@ def detectar_movimiento(id_sensor):
         return False
 
 syslog.syslog('Sensores correctamente inicializados.')
-mover_x_angulos(180)
+#mover_x_angulos(180)
 
 try:
     while True:
@@ -138,16 +137,21 @@ try:
             syslog.syslog('Sensor de movimiento 1 a detectado movimiento.')
             notificar(SENSOR_MOVIMIENTO_1)
             contador_foto +=1 
-            if contador_foto > 10:
+            if contador_foto > 12:
                 syslog.syslog('max')
                 contador_foto = 0
                 sleep(1)
                 break
-        """
         if detectar_movimiento(SENSOR_MOVIMIENTO_2):
             syslog.syslog('Sensor de movimiento 2 a detectado movimiento.')
             notificar(SENSOR_MOVIMIENTO_2)
-        """
+            contador_foto +=1 
+            if contador_foto > 12:
+                syslog.syslog('max')
+                contador_foto = 0
+                sleep(1)
+                break
+        
         #mover_x_angulos(180)
         sleep(0.25)
 except KeyboardInterrupt:
