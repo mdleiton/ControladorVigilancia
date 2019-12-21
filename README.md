@@ -20,13 +20,13 @@ El controlador esta compuesto de los siguientes componentes:
 ![Alt text](esquema/esquema.png "esquema")
 
 2. Ejecutar el siguiente script
-´´´
+```
     cd raspController
     ./build.sh
-´´´
+```
 
 3. Ejecutar el siguiente script
-´´´
+```
     cd raspController
     python controlador.py
-´´´
+```
