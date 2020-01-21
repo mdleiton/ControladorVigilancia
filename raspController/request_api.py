@@ -6,14 +6,7 @@ URL_SERVER = "http://192.168.0.9:8081/"
 END_POINT_SEND_ALARM = "novelties/"
 API_LOGIN = "api-token-auth/ "
 DIR_VIDEOS = ""
-TOKEN = None
 CREDENTIALS = {'username': "admin1", 'password': "adminadmin"}
-
-def obtener_fecha_hora():
-    """permite obtener una cadena de texto que representa la fecha actual."""
-    now = datetime.now()
-    return now.strftime("%d-%m-%Y_%H:%M:%S")
-
 
 headers= {}
 r = requests.post(URL_SERVER + API_LOGIN,data=CREDENTIALS, timeout=2)
