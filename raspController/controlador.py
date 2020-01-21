@@ -6,6 +6,7 @@ import signal
 import requests
 import threading
 import syslog
+import os
 syslog.syslog('Controlador Inicializado')
 
 GPIO.setmode(GPIO.BOARD)
@@ -21,8 +22,10 @@ CANTIDAD_FOTOS = 1
 INTENTOS_NOTIFICAR = 1
 DIR_IMAGENES = "/home/pi/imagenes/"
 DIR_VIDEOS = "/home/pi/videos/"
-URL_SERVER = "http://200.126.1.152:8080/"
-END_POINT_SEND_ALARM = "alarm/"
+URL_SERVER = "http://10.10.1.119:8081/"
+END_POINT_SEND_ALARM = "novelties/"
+API_LOGIN = "api-token-auth/ "
+CREDENTIALS = {'username': "admin1", 'password': "adminadmin"}
 
 ANGULO_ACTUAL = 0
 
@@ -45,24 +48,31 @@ camera.framerate = 15
 lock = threading.Lock()
 
 def thread_function():
-    global lock, contador_foto
-    for i in range(0, CANTIDAD_FOTOS):
+    global lock, contador_foto, DIR_VIDEOS, URL_SERVER, API_LOGIN, CREDENTIALS, END_POINT_SEND_ALARM
+    for i in range(CANTIDAD_FOTOS):
         nombre = obtener_fecha_hora() +  ".h264" #".jpg"
         lock.acquire()
         grabar(nombre, 10)
         #tomar_foto(nombre)
         lock.release()
+        nombremp4 = DIR_VIDEOS+nombre[:-5]+".mp4"
+        os.rename(DIR_VIDEOS+nombre, nombremp4)
         intentos = INTENTOS_NOTIFICAR
         while intentos>0:
             intentos -= 1
-            break
-            files = {'media': open(DIR_IMAGENES + nombre, 'rb')}
-            try: 
-                r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, files=files, timeout=2)
-                if r.status_code ==  200:
-                    syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " enviada correctamente.")
+            try:
+                headers= {}
+                r = requests.post(URL_SERVER + API_LOGIN,data=CREDENTIALS, timeout=2)
+                if "token" in r.json():
+                    headers["Authorization"] = "Token " + r.json()["token"]
+                data = {"date_time":datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "node": "1", "region": "1"}
+                files = {}
+                files["video"] = open(DIR_VIDEOS + nombremp4, 'rb')
+                r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, data=data, files=files, timeout=None, headers=headers)
+                if r.status_code ==  201:
+                    syslog.syslog("Foto tomada, enviada correctamente.")
                 else:
-                    syslog.syslog('Foto tomada, guardada con nombre:' + nombre + " no se puede enviar.")
+                    syslog.syslog("Foto tomada, no se puede enviar.")
             except Exception:
                 syslog.syslog("TimeoutException")
         return 1
