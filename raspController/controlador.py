@@ -6,6 +6,7 @@ import signal
 import requests
 import threading
 import syslog
+import os
 syslog.syslog('Controlador Inicializado')
 
 GPIO.setmode(GPIO.BOARD)
@@ -55,6 +56,7 @@ def thread_function():
         grabar(nombre, 7)
         tomar_foto(nombre)
         lock.release()
+        os.rename(nombre, nombre[:-5]+".mp4")
         intentos = INTENTOS_NOTIFICAR
         while intentos>0:
             intentos -= 1
