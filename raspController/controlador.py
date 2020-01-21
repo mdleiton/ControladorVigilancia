@@ -63,7 +63,7 @@ def thread_function():
                 r = requests.post(URL_SERVER + API_LOGIN,data=CREDENTIALS, timeout=2)
                 if "token" in r.json():
                     headers["Authorization"] = "Token " + r.json()["token"]
-                data = {"date_time":datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "node": URL_SERVER + "nodes/1/", "region": "1"}
+                data = {"date_time":datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "node": "1", "region": "1"}
                 files = {}
                 files["video"] = open(DIR_VIDEOS + nombre, 'rb')
                 r = requests.post(URL_SERVER + END_POINT_SEND_ALARM, data=data, files=files, timeout=None, headers=headers)
