@@ -30,3 +30,11 @@ El controlador esta compuesto de los siguientes componentes:
     cd raspController
     python controlador.py
 ```
+
+Otros repositorios:
+* Aplicación móvil. [github](https://github.com/vicbrodr21/ProyectoRedesSensores)
+* Api del gateway.[github](https://github.com/bpovea/api_sensores_server)
+* Nodo.[github](https://github.com/vicbrodr21/ProyectoRedesSensores)
+
+
+
